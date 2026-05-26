@@ -1,0 +1,461 @@
+import collections
+import ctypes
+import math
+import os
+import time
+import cv2
+import mediapipe as mp
+from mediapipe.tasks.python.vision import FaceLandmarker, FaceLandmarkerOptions
+from mediapipe.tasks.python.core.base_options import BaseOptions
+import numpy as np
+
+# --- Landmark indeksleri ---
+LEFT_EYE   = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+RIGHT_EYE  = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+LEFT_IRIS  = [468, 469, 470, 471, 472]
+RIGHT_IRIS = [473, 474, 475, 476, 477]
+
+# Göz köşe / üst-alt noktaları
+L_OUTER, L_INNER, L_TOP, L_BOT = 33, 133, 159, 145
+R_OUTER, R_INNER, R_TOP, R_BOT = 263, 362, 386, 374
+
+# EAR (göz açıklığı) için yatay + dikey noktalar
+# Sol: yatay=(33,133), dikey=(159,145, 158,153)
+# Sağ: yatay=(263,362), dikey=(386,374, 385,380)
+
+PROCESS_WIDTH = 640
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_landmarker.task")
+
+user32   = ctypes.windll.user32
+SCREEN_W = user32.GetSystemMetrics(0)
+SCREEN_H = user32.GetSystemMetrics(1)
+
+# Kalibrasyon: 9 nokta (3x3 ızgara) — daha iyi kapsama
+CAL_POINTS_REL = [
+    (0.50, 0.50),
+    (0.08, 0.08), (0.50, 0.08), (0.92, 0.08),
+    (0.08, 0.50),               (0.92, 0.50),
+    (0.08, 0.92), (0.50, 0.92), (0.92, 0.92),
+]
+CAL_WAIT    = 1.2   # göz stabilize olsun (s)
+CAL_COLLECT = 2.0   # örnek toplama (s)
+EAR_BLINK   = 0.17  # bu değerin altında göz kapalı sayılır
+
+
+# ─────────────────────────────────────────────
+# Yardımcı fonksiyonlar
+# ─────────────────────────────────────────────
+
+def lm_to_px(lm, w, h):
+    return (int(lm.x * w), int(lm.y * h))
+
+
+def eye_bbox(points, pad_x=0.25, pad_y=0.40):
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    x0, x1 = min(xs), max(xs)
+    y0, y1 = min(ys), max(ys)
+    pw = int((x1 - x0) * pad_x)
+    ph = int((y1 - y0) * pad_y)
+    return x0 - pw, y0 - ph, x1 + pw, y1 + ph
+
+
+def draw_iris(frame, iris_px):
+    cx, cy = iris_px[0]
+    if len(iris_px) > 1:
+        radius = int(np.mean([np.hypot(p[0]-cx, p[1]-cy) for p in iris_px[1:]]))
+    else:
+        radius = 8
+    radius = max(radius, 2)
+    cv2.circle(frame, (cx, cy), radius, (0, 0, 220), 2)
+    cv2.circle(frame, (cx, cy), 2, (255, 230, 0), -1)
+
+
+def compute_ear(lms):
+    """Eye Aspect Ratio — her iki göz ortalaması. Kırpma tespiti için."""
+    def _ear(h1, h2, v1, v2, v3, v4):
+        horiz = math.hypot(lms[h1].x - lms[h2].x, lms[h1].y - lms[h2].y)
+        if horiz < 1e-6:
+            return 1.0
+        vert1 = math.hypot(lms[v1].x - lms[v2].x, lms[v1].y - lms[v2].y)
+        vert2 = math.hypot(lms[v3].x - lms[v4].x, lms[v3].y - lms[v4].y)
+        return (vert1 + vert2) / (2.0 * horiz)
+    ear_l = _ear(33, 133, 159, 145, 158, 153)
+    ear_r = _ear(263, 362, 386, 374, 385, 380)
+    return (ear_l + ear_r) / 2.0
+
+
+def get_head_angles(transform_matrix_data):
+    """
+    MediaPipe facial_transformation_matrixes'ten yaw ve pitch açılarını çıkar (radyan).
+    Dönüş matrisi (3x3) → cv2.Rodrigues ile rotasyon vektörü → pitch/yaw.
+    """
+    mat = np.array(transform_matrix_data.data, dtype=float).reshape(4, 4)
+    R   = mat[:3, :3]
+    rvec, _ = cv2.Rodrigues(R)
+    pitch = float(rvec[0, 0])   # yukarı/aşağı kafa hareketi
+    yaw   = float(rvec[1, 0])   # sola/sağa kafa hareketi
+    return yaw, pitch
+
+
+def compute_gaze_features(lms, transform_matrix_data):
+    """
+    4 özellikli gaze vektörü döner: [head_yaw, head_pitch, iris_x, iris_y]
+
+    iris_x ve iris_y, göz GENİŞLİĞİne normalize edilir (yüksekliğe değil).
+    Bu yöntemle dikey gürültü dramatik şekilde azalır çünkü göz genişliği
+    yüksekliğinden 3-4 kat büyüktür.
+    """
+    yaw, pitch = get_head_angles(transform_matrix_data)
+
+    def _iris_ratio(iris_idx, outer_idx, inner_idx, top_idx, bot_idx):
+        outer = lms[outer_idx]
+        inner = lms[inner_idx]
+        top   = lms[top_idx]
+        bot   = lms[bot_idx]
+        iris  = lms[iris_idx]
+        ew = abs(inner.x - outer.x)   # göz genişliği (normalize tabanı)
+        eh = abs(bot.y - top.y)
+        if ew < 1e-5 or eh < 1e-5:
+            return None
+        cx = (outer.x + inner.x) / 2.0
+        cy = (top.y + bot.y) / 2.0
+        # Her iki eksen de göz GENİŞLİĞİNE bölünür → Y gürültüsü azalır
+        return (iris.x - cx) / ew, (iris.y - cy) / ew
+
+    left  = _iris_ratio(468, L_OUTER, L_INNER, L_TOP, L_BOT)
+    right = _iris_ratio(473, R_OUTER, R_INNER, R_TOP, R_BOT)
+
+    if left and right:
+        iris_x = (left[0] + right[0]) / 2.0
+        iris_y = (left[1] + right[1]) / 2.0
+    elif left:
+        iris_x, iris_y = left
+    elif right:
+        iris_x, iris_y = right
+    else:
+        return None
+
+    return [yaw, pitch, iris_x, iris_y]
+
+
+def process_frame(cap, face_landmarker):
+    """Kameradan frame yakala ve yüz tespiti yap."""
+    ret, frame = cap.read()
+    if not ret:
+        return None, None, 0, 0
+    orig_h, orig_w = frame.shape[:2]
+    scale = PROCESS_WIDTH / orig_w if orig_w > PROCESS_WIDTH else 1.0
+    small = cv2.resize(frame, (int(orig_w * scale), int(orig_h * scale))) if scale < 1.0 else frame
+    rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+    mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+    result = face_landmarker.detect(mp_img)
+    return frame, result, orig_w, orig_h
+
+
+# ─────────────────────────────────────────────
+# Kalman Filtresi (2D konum + hız)
+# ─────────────────────────────────────────────
+
+class KalmanGaze:
+    """
+    Durum vektörü: [x, y, vx, vy]
+    Ölçüm: [x, y]
+    EMA'ya kıyasla avantajı: hız tahminini kullanarak anlık gürültüyü filtreler
+    ama gerçek harekete yeterince hızlı tepki verir.
+    """
+    def __init__(self, process_noise=120.0, measure_noise=2800.0):
+        dt = 1.0 / 30.0
+        self.x = np.array([[SCREEN_W / 2.0],
+                            [SCREEN_H / 2.0],
+                            [0.0],
+                            [0.0]])
+        self.P = np.eye(4) * 2000.0
+        self.F = np.array([[1, 0, dt, 0],
+                            [0, 1, 0, dt],
+                            [0, 0, 1,  0],
+                            [0, 0, 0,  1]], dtype=float)
+        self.H = np.array([[1, 0, 0, 0],
+                            [0, 1, 0, 0]], dtype=float)
+        self.Q = np.eye(4) * process_noise
+        self.R = np.eye(2) * measure_noise
+
+    def update(self, meas):
+        """Ölçüm al ve filtrelenmiş (x, y) döndür."""
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+        z = np.array([[float(meas[0])], [float(meas[1])]])
+        y = z - self.H @ self.x
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        self.x = self.x + K @ y
+        self.P = (np.eye(4) - K @ self.H) @ self.P
+        return self._clamp()
+
+    def predict_only(self):
+        """Ölçüm yokken (kırpma sırasında) yalnızca tahmin yürüt."""
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+        return self._clamp()
+
+    def _clamp(self):
+        return (
+            int(np.clip(self.x[0, 0], 0, SCREEN_W - 1)),
+            int(np.clip(self.x[1, 0], 0, SCREEN_H - 1)),
+        )
+
+
+# ─────────────────────────────────────────────
+# GazeMapper — kalibrasyon + mapping
+# ─────────────────────────────────────────────
+
+class GazeMapper:
+    def __init__(self):
+        self.M      = None   # şekil (5, 2): [yaw, pitch, ix, iy, 1] @ M = [sx, sy]
+        self.kalman = KalmanGaze()
+
+    def calibrate(self, features_list, screen_pts):
+        """
+        features_list : [[yaw, pitch, ix, iy], ...]
+        screen_pts    : [[sx, sy], ...]
+        lstsq ile affine dönüşüm matrisi hesaplanır.
+        """
+        A = np.array([[*f, 1.0] for f in features_list], dtype=float)
+        B = np.array(screen_pts, dtype=float)
+        self.M, _, _, _ = np.linalg.lstsq(A, B, rcond=None)
+        # Kalman'ı sıfırla ki eski konum yeni kalibrasyonu bozmasın
+        self.kalman = KalmanGaze()
+
+    def map(self, features, blinking=False):
+        if self.M is None or features is None:
+            return self.kalman.predict_only()
+        if blinking:
+            return self.kalman.predict_only()
+        raw = np.array([*features, 1.0], dtype=float) @ self.M
+        return self.kalman.update(raw)
+
+
+# ─────────────────────────────────────────────
+# Kalibrasyon ekranı
+# ─────────────────────────────────────────────
+
+def _trim_mean(samples, trim=0.15):
+    """Aşırı değerleri at (alt ve üst %trim), kalanı ortala."""
+    arr = np.array(samples, dtype=float)
+    n   = len(arr)
+    lo  = int(n * trim)
+    hi  = n - lo
+    # Her eksen için ayrı sırala
+    result = []
+    for col in range(arr.shape[1]):
+        s = np.sort(arr[:, col])
+        result.append(np.mean(s[lo:hi]) if hi > lo else np.mean(s))
+    return result
+
+
+def run_calibration(cap, face_landmarker):
+    """
+    Tam ekran 9 noktalı kalibrasyon.
+    Döner: (features_list, screen_pts)  ya da  None (iptal).
+    """
+    cal_win = "KALIBRASYON"
+    cv2.namedWindow(cal_win, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(cal_win, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    features_list = []
+    screen_pts    = []
+    pt_idx = 0
+
+    while pt_idx < len(CAL_POINTS_REL):
+        rx, ry = CAL_POINTS_REL[pt_idx]
+        sx = int(rx * SCREEN_W)
+        sy = int(ry * SCREEN_H)
+
+        pt_start = time.perf_counter()
+        samples  = []
+
+        while True:
+            frame, result, _, _ = process_frame(cap, face_landmarker)
+            if frame is None:
+                cv2.destroyWindow(cal_win)
+                return None
+
+            elapsed = time.perf_counter() - pt_start
+
+            if (result.face_landmarks
+                    and result.facial_transformation_matrixes
+                    and elapsed > CAL_WAIT):
+                lms = result.face_landmarks[0]
+                ear = compute_ear(lms)
+                if ear > EAR_BLINK:   # göz açık
+                    feats = compute_gaze_features(lms, result.facial_transformation_matrixes[0])
+                    if feats:
+                        samples.append(feats)
+
+            # --- Çizim ---
+            cal_frame = np.zeros((SCREEN_H, SCREEN_W, 3), dtype=np.uint8)
+
+            msg = f"Noktaya bakin  ({pt_idx + 1} / {len(CAL_POINTS_REL)})"
+            (tw, _), _ = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)
+            cv2.putText(cal_frame, msg, ((SCREEN_W - tw) // 2, 70),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (200, 200, 200), 2, cv2.LINE_AA)
+            cv2.putText(cal_frame, "q = iptal", (30, SCREEN_H - 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (90, 90, 90), 1, cv2.LINE_AA)
+
+            for i, (frx, fry) in enumerate(CAL_POINTS_REL):
+                if i != pt_idx:
+                    fx, fy = int(frx * SCREEN_W), int(fry * SCREEN_H)
+                    cv2.circle(cal_frame, (fx, fy), 8, (40, 40, 40), -1)
+
+            blink_anim = int(elapsed * 6) % 2 == 0
+            dot_color  = (0, 255, 255) if blink_anim else (0, 120, 120)
+            if elapsed > CAL_WAIT:
+                arc_pct   = min((elapsed - CAL_WAIT) / CAL_COLLECT, 1.0)
+                arc_angle = int(360 * arc_pct)
+                cv2.ellipse(cal_frame, (sx, sy), (34, 34), -90, 0, arc_angle,
+                            (0, 230, 0), 4, cv2.LINE_AA)
+            cv2.circle(cal_frame, (sx, sy), 20, dot_color, -1)
+            cv2.circle(cal_frame, (sx, sy), 20, (255, 255, 255), 2, cv2.LINE_AA)
+
+            # Örnek sayısı göster
+            if samples:
+                cv2.putText(cal_frame, f"ornek: {len(samples)}", (sx - 40, sy + 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 200, 100), 1, cv2.LINE_AA)
+
+            cv2.imshow(cal_win, cal_frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                cv2.destroyWindow(cal_win)
+                return None
+
+            if elapsed >= CAL_WAIT + CAL_COLLECT:
+                break
+
+        if len(samples) >= 10:
+            features_list.append(_trim_mean(samples))
+            screen_pts.append((sx, sy))
+            pt_idx += 1
+        else:
+            # Yetersiz örnek → noktayı atla (lstsq kalan noktalarla çalışır)
+            pt_idx += 1
+
+    cv2.destroyWindow(cal_win)
+
+    if len(features_list) < 5:
+        return None
+
+    return features_list, screen_pts
+
+
+# ─────────────────────────────────────────────
+# Ana döngü
+# ─────────────────────────────────────────────
+
+def main():
+    options = FaceLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=MODEL_PATH),
+        num_faces=1,
+        min_face_detection_confidence=0.5,
+        min_face_presence_confidence=0.5,
+        min_tracking_confidence=0.5,
+        output_facial_transformation_matrixes=True,
+    )
+    face_landmarker = FaceLandmarker.create_from_options(options)
+
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
+    gaze_mapper  = GazeMapper()
+    frame_times  = collections.deque(maxlen=30)
+    mouse_active = True
+    blink_frames = 0       # üst üste kırpma frame sayacı
+
+    cal = run_calibration(cap, face_landmarker)
+    if cal is None:
+        cap.release()
+        face_landmarker.close()
+        return
+    gaze_mapper.calibrate(*cal)
+
+    while True:
+        frame, result, orig_w, orig_h = process_frame(cap, face_landmarker)
+        if frame is None:
+            break
+
+        frame_times.append(time.perf_counter())
+        fps = ((len(frame_times) - 1) / (frame_times[-1] - frame_times[0])
+               if len(frame_times) > 1 else 0.0)
+
+        blinking = False
+
+        if result.face_landmarks and result.facial_transformation_matrixes:
+            lms = result.face_landmarks[0]
+
+            # Göz kutuları ve iris çiz
+            left_pts       = [lm_to_px(lms[i], orig_w, orig_h) for i in LEFT_EYE]
+            right_pts      = [lm_to_px(lms[i], orig_w, orig_h) for i in RIGHT_EYE]
+            left_iris_pts  = [lm_to_px(lms[i], orig_w, orig_h) for i in LEFT_IRIS]
+            right_iris_pts = [lm_to_px(lms[i], orig_w, orig_h) for i in RIGHT_IRIS]
+
+            lx0, ly0, lx1, ly1 = eye_bbox(left_pts)
+            rx0, ry0, rx1, ry1 = eye_bbox(right_pts)
+            cv2.rectangle(frame, (lx0, ly0), (lx1, ly1), (0, 220, 0), 2)
+            cv2.rectangle(frame, (rx0, ry0), (rx1, ry1), (0, 220, 0), 2)
+            draw_iris(frame, left_iris_pts)
+            draw_iris(frame, right_iris_pts)
+
+            # Kırpma tespiti
+            ear = compute_ear(lms)
+            if ear < EAR_BLINK:
+                blink_frames += 1
+                blinking = blink_frames >= 2   # 2 üst üste frame = gerçek kırpma
+            else:
+                blink_frames = 0
+
+            # EAR göstergesi
+            ear_color = (0, 0, 200) if blinking else (0, 200, 0)
+            cv2.putText(frame, f"EAR: {ear:.2f}", (10, orig_h - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, ear_color, 1, cv2.LINE_AA)
+
+            # Mouse hareketi
+            feats = compute_gaze_features(lms, result.facial_transformation_matrixes[0])
+            pos   = gaze_mapper.map(feats, blinking=blinking)
+            if pos and mouse_active:
+                user32.SetCursorPos(pos[0], pos[1])
+
+            status_text  = "KIRPMA" if blinking else ("ACIK" if mouse_active else "DURDURULDU")
+            status_color = (0, 80, 220) if blinking else ((0, 220, 0) if mouse_active else (0, 165, 255))
+        else:
+            gaze_mapper.map(None)   # Kalman'ı tahmin yürüt
+            status_text  = "YUZ YOK"
+            status_color = (0, 0, 220)
+
+        cv2.putText(frame, f"FPS: {fps:.1f}", (10, 32),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 230, 230), 2, cv2.LINE_AA)
+        cv2.putText(frame, f"GOZ: {status_text}", (10, 64),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.85, status_color, 2, cv2.LINE_AA)
+        cv2.putText(frame, "q:cik  c:kalibrasyon  p:durdur/devam",
+                    (10, orig_h - 15), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55, (140, 140, 140), 1, cv2.LINE_AA)
+
+        cv2.imshow("Goz Algilama", frame)
+        key = cv2.waitKey(1) & 0xFF
+
+        if key == ord('q'):
+            break
+        elif key == ord('c'):
+            new_cal = run_calibration(cap, face_landmarker)
+            if new_cal:
+                gaze_mapper.calibrate(*new_cal)
+        elif key == ord('p'):
+            mouse_active = not mouse_active
+
+    cap.release()
+    cv2.destroyAllWindows()
+    face_landmarker.close()
+
+
+if __name__ == "__main__":
+    main()
