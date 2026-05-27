@@ -34,10 +34,10 @@ CAL_POINTS_REL = [
 ]
 CAL_WAIT=1.2; CAL_COLLECT=1.8; CAL_RIDGE=0.02; EAR_BLINK=0.40
 DEAD_ZONE=0; GAZE_X_OFFSET=0; GAZE_Y_OFFSET=-2; GAZE_Y_FLIP=1
-HEAD_DELTA_GATE=0.22; TPS_IRIS_WEIGHT=1.5
-CAL_EXPAND_X = 1.0
+HEAD_DELTA_GATE=0.22; TPS_IRIS_WEIGHT=1.0
+CAL_EXPAND_X = 1.10
 CAL_EXPAND_Y = 1.15
-VEL_DAMP_THRESHOLD=0.6; ADAPTIVE_DEAD_BASE=0; ADAPTIVE_DEAD_BONUS=10; ADAPTIVE_DEAD_SPEED=14.0
+VEL_DAMP_THRESHOLD=1.2; ADAPTIVE_DEAD_BASE=3; ADAPTIVE_DEAD_BONUS=10; ADAPTIVE_DEAD_SPEED=14.0
 MOUSEEVENTF_LEFTDOWN=0x0002; MOUSEEVENTF_LEFTUP=0x0004
 IRI_DOWN_GATE=0.25
 
@@ -132,7 +132,7 @@ def process_frame(cap,fl):
 
 # ─── Kalman ───────────────────────────────────────────────────────────────────
 class KalmanGaze:
-    def __init__(self,pn=20.,mn=1400.):
+    def __init__(self,pn=40.,mn=600.):
         dt=1/30.; self.x=np.array([[SCREEN_W/2.],[SCREEN_H/2.],[0.],[0.]])
         self.P=np.eye(4)*2000.
         self.F=np.array([[1,0,dt,0],[0,1,0,dt],[0,0,1,0],[0,0,0,1]],float)
@@ -242,7 +242,7 @@ def _is_eye_closed(ear, baseline, prev_ear, in_blink, iry=0.0):
     # Yeni kırpma başlangıcı: aşağı bakış ise bastır
     if iry > IRI_DOWN_GATE:
         return False
-    return (ear < threshold) and (prev_ear - ear > 0.025)
+    return (ear < threshold) and (prev_ear - ear > 0.018)
 
 class BlinkDetector:
     DOUBLE_WIN_S = 0.70   # ilk kırpma bittikten sonra ikincisini bekleme süresi
@@ -292,10 +292,10 @@ class BlinkDetector:
 #    380ms geçer, ikinci kırpma gelmezse → 'advance' gönderilir
 # ─────────────────────────────────────────────────────────────────────────────
 class ScanBlinkDetector:
-    NOISE_S      = 0.07    # bu kadardan kısa kapanmalar gürültü sayılır
+    NOISE_S      = 0.05    # bu kadardan kısa kapanmalar gürültü sayılır
     ROW_SKIP_S   = 0.85    # ≥ bu kadar tut → 'row_skip' (göz açılınca)
     TOGGLE_S     = 2.00    # ≥ bu kadar tut → 'toggle' (kapalıyken tetikler)
-    DOUBLE_WIN_S = 0.55    # iki kırpma arası bu kadar ise → 'double'
+    DOUBLE_WIN_S = 0.70    # iki kırpma arası bu kadar ise → 'double'
     MIN_FRAMES   = 2       # gerçek kırpma için minimum ardışık kapalı kare
 
     def __init__(self):
