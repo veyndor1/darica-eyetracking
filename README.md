@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="Darica Eye Tracking" width="100%" />
+  <img src="docs/assets/banner.svg" alt="Eye Tracking" width="100%" />
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
 
 ## What is this?
 
-Darica Eye Tracking tracks your eye movements with a webcam and moves the mouse cursor accordingly. Double-blink to click, or open the scan keyboard and type letter by letter using blinks. A webcam and Python are the only requirements.
+Eye Tracking tracks your eye movements with a webcam and moves the mouse cursor accordingly. Double-blink to click, or open the scan keyboard and type letter by letter using blinks. A webcam and Python are the only requirements.
 
 Dedicated eye trackers cost a lot, and most people with physical disabilities can't easily get one. I wanted to see how far you could get with a regular webcam, and this is what came out of that.
 
