@@ -1,98 +1,82 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="Darica Eye Tracking" width="120" />
-</p>
-
-<h1 align="center">Darica Eye Tracking</h1>
-
-<p align="center">
-  Webcam ile goz takibi yaparak mouse kontrolu, tiklama ve yazma
+  <img src="docs/assets/banner.svg" alt="Darica Eye Tracking" width="100%" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/veyndor1/darica-eyetracking/actions/workflows/ci.yml">
-    <img src="https://github.com/veyndor1/darica-eyetracking/actions/workflows/ci.yml/badge.svg" alt="CI" />
-  </a>
-  <a href="https://github.com/veyndor1/darica-eyetracking/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" />
-  </a>
-  <a href="https://www.python.org/downloads/">
-    <img src="https://img.shields.io/badge/python-3.9%2B-brightgreen.svg" alt="Python 3.9+" />
-  </a>
-  <a href="https://github.com/veyndor1/darica-eyetracking/stargazers">
-    <img src="https://img.shields.io/github/stars/veyndor1/darica-eyetracking?style=social" alt="Stars" />
-  </a>
-  <a href="https://github.com/veyndor1/darica-eyetracking/issues">
-    <img src="https://img.shields.io/github/issues/veyndor1/darica-eyetracking.svg" alt="Issues" />
-  </a>
+  <a href="https://github.com/veyndor1/darica-eyetracking/actions/workflows/ci.yml"><img src="https://github.com/veyndor1/darica-eyetracking/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-MIT-blue.svg" alt="MIT" /></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9%2B-brightgreen.svg" alt="Python 3.9+" /></a>
+  <a href="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi-lightgrey"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi-lightgrey" alt="Platform" /></a>
+  <a href="https://github.com/veyndor1/darica-eyetracking/stargazers"><img src="https://img.shields.io/github/stars/veyndor1/darica-eyetracking?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
-  <a href="#kurulum">Kurulum</a> &#8226;
-  <a href="#kullanim">Kullanim</a> &#8226;
-  <a href="#nasil-calisir">Nasil calisir</a> &#8226;
-  <a href="#raspberry-pi">Raspberry Pi</a> &#8226;
-  <a href="#katki">Katki</a>
+  <a href="#-kurulum">Kurulum</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="#-kullanim">Kullanim</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="#-mimari">Mimari</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="#-raspberry-pi">Raspberry Pi</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="#-katki">Katki</a>
 </p>
 
----
+<br/>
 
-## Ne ise yariyor?
+## Hakkinda
 
-Darica Eye Tracking, siradan bir webcam ile goz hareketlerini takip edip mouse imlecini kontrol ediyor. Cift kirpmayla tiklama yapiyor, gozle taranabilen bir ekran klavyesiyle yazi yazmanizi sagliyor. Ozel bir donanim yok, bir webcam ve Python yeterli.
+Darica Eye Tracking, siradan bir webcam ile goz hareketlerini takip edip mouse imlecini kontrol eden bir yazilim. Cift kirpmayla tiklama yapiyor, gozle taranabilen bir ekran klavyesiyle yazi yazmanizi sagliyor.
 
-Projenin asil amaci fiziksel engelli bireylerin bilgisayari kullanabilmesi. Ama genel olarak goz takibi ile deney yapmak isteyen herkes kullanabilir.
+Ozel donanim gerekmiyor. Webcam ve Python yeterli.
 
-### Ne yapar?
+Projenin ilk hedefi fiziksel engelli bireylerin bilgisayara erisimi, ama goz takibi uzerine deney yapmak isteyen herkes kullanabilir.
 
-| | |
-|---|---|
-| Goz ile mouse kontrolu | Iris pozisyonu ve bas acisini birlestirerek ekranda imleç hareket ettiriyor |
-| Kirpma ile tiklama | Cift kirpma = sol tik |
-| Tarama klavyesi | Tek kirpmayla harf harf ilerleyip, cift kirpmayla secim yapan ekran klavyesi |
-| Turkce kelime tahmini | Yazdikca Turkce kelime onerileri cikiyor |
-| 13 noktali kalibrasyon | Her kullanici icin ayri goz modeli olusturuyor |
-| Raspberry Pi destegi | Picamera2 ile gomulu sistemde de calisiyor |
-| Kalman + One Euro filtre | Titresimi ve gurultuyu bastiriyor |
-| TPS + Ridge regresyon | Bakis yonunu ekran koordinatina ceviren iki katmanli model |
-| Adaptif dead zone | Yavas hareketlerde gereksiz titresimi yok ediyor |
+<br/>
 
----
+<table>
+<tr>
+<td width="50%">
+
+### Goz Takibi
+- Iris pozisyonu + bas acisi ile mouse kontrolu
+- 13 noktali kisisel kalibrasyon
+- TPS ve Ridge regresyon ile bakis haritalama
+- Kalman + One Euro filtre ile titresim bastirma
+- Adaptif dead zone (yavas hareketlerde kararlililik)
+
+</td>
+<td width="50%">
+
+### Kirpma ve Klavye
+- Cift kirpma = sol tiklama
+- Tarama klavyesi (goz kirpmasiyla harf secimi)
+- Turkce kelime tahmini
+- Adaptif EAR esigi (asagi bakista yalanci kirpma engeli)
+- 2 sn goz kapatma ile klavye acma/kapama
+
+</td>
+</tr>
+</table>
+
+<br/>
 
 ## Mimari
 
-```
-Kamera karesi
-    |
-    v
-MediaPipe Face Landmarker
-    |
-    +---> Iris konumu (468-477 landmark)
-    +---> Bas pozisyonu (donusum matrisi)
-    +---> EAR hesaplama (goz aciklik orani)
-    |
-    v
-Kalibrasyon modeli (TPS / Ridge)
-    |
-    v
-One Euro Filter --> Kalman Filter --> Dead Zone
-    |                                      |
-    v                                      v
-Mouse hareketi                       Kirpma algilama
-                                          |
-                              +-----------+-----------+
-                              |                       |
-                         Cift kirpma            Tarama klavye
-                         (sol tik)           (harf secimi/yazma)
-```
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Sistem Mimarisi" width="100%" />
+</p>
 
----
+<details>
+<summary>Teknik detaylar</summary>
+
+<br/>
+
+**Goz takibi:** MediaPipe Face Landmarker 478 yuz noktasi cikartiyor. Iris landmarklari (468-477) ve bas donusum matrisi, Ridge regresyon + TPS interpolasyonu ile kalibre edilmis ekran koordinatlarina donusuyor.
+
+**Filtreleme:** Uc katman calisiyor sirayla. One Euro Filter dusuk gecikmeli yumusatma yapiyor, Kalman Filter durum tahmini ve gurultu azaltiyor, Adaptif Dead Zone ise yavas hareketlerde gereksiz titresimleri yok sayiyor.
+
+**Kirpma algilama:** Eye Aspect Ratio (EAR) uzerinden calisiyor. Esik adaptif, surekli guncelleniyor. Asagi bakarken iris Y koordinatini kontrol ederek yalanci kirpmalari engelliyor.
+
+</details>
+
+<br/>
 
 ## Kurulum
 
-Gereken seyler:
-- Python 3.9+
-- Webcam
-- Windows 10/11 veya Raspberry Pi OS
+> **Gereksinimler:** Python 3.9+, webcam, Windows 10/11 veya Raspberry Pi OS
 
 ### Windows
 
@@ -112,40 +96,32 @@ pip install -r requirements-rpi.txt
 
 ### MediaPipe modeli
 
-Proje `face_landmarker.task` dosyasini kullaniyor; repoda mevcut. Guncelleme icin:
+`face_landmarker.task` repoda mevcut. Guncellemek isterseniz:
 
 ```bash
 wget -O face_landmarker.task \
   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
 ```
 
----
+<br/>
 
 ## Kullanim
 
-### Windows
-
 ```bash
+# Windows
 python gazetracking.py
-```
 
-### Raspberry Pi
-
-```bash
+# Raspberry Pi
 python rasbperrypi.py
 ```
 
-### Kalibrasyon
-
-Program acilinca 13 noktali kalibrasyon ekrani geliyor. Her noktaya sirayla bakin, sistem goz modelinizi olustursun.
-
-Kalibrasyon sirasinda hem basinizi hem gozlerinizi noktaya dogru cevirin. Bittikten sonra imleç gozunuze karsilik verecek.
+Program acilinca 13 noktali kalibrasyon ekrani geliyor. Her noktaya sirayla bakin; sistem goz modelinizi olustursun. Kalibrasyon sirasinda hem basinizi hem gozlerinizi noktaya dogru cevirin.
 
 ### Kisayollar
 
 | Tus | Ne yapar |
-|-----|----------|
-| `q` / `ESC` | Cikis |
+|:---:|----------|
+| `q` | Cikis |
 | `c` | Yeniden kalibrasyon |
 | `p` | Mouse kontrolunu ac/kapat |
 | `b` | Tiklamayi ac/kapat |
@@ -154,60 +130,40 @@ Kalibrasyon sirasinda hem basinizi hem gozlerinizi noktaya dogru cevirin. Bittik
 
 Gozlerinizi 2 saniye kapali tutunca tarama klavyesi acilir (ayni sekilde kapatilir):
 
-| Hareket | Ne yapar |
-|---------|----------|
+| Hareket | Sonuc |
+|---------|-------|
 | Tek kirpma | Sonraki harfe gec |
 | Cift kirpma | Secili harfi yaz |
-| 1 sn goz kapali tut | Sonraki satira atla |
-| 2 sn goz kapali tut | Klavyeyi ac/kapat |
+| ~1 sn goz kapali | Sonraki satira atla |
+| ~2 sn goz kapali | Klavyeyi ac/kapat |
 
----
-
-## Nasil calisir
-
-### Goz takibi
-
-MediaPipe Face Landmarker 478 yuz noktasi cikartiyor. Bunlarin arasinda iris landmarklari (468-477) ve bas donusum matrisi var. Ridge regresyon ile TPS interpolasyonunun birlesimi, bu ham veriyi kalibre edilmis ekran koordinatlarina donusturuyor.
-
-### Titresim bastirma
-
-Uc katman var:
-1. One Euro Filter: dusuk gecikmeli yumusatma
-2. Kalman Filter: durum tahmini ve gurultu azaltma
-3. Adaptif dead zone: yavas hareketlerde kucuk titresimleri yok sayma
-
-### Kirpma algilama
-
-Eye Aspect Ratio (EAR) uzerinden calisiyior. Esik degeri adaptif, surekli guncelleniyor. Asagi bakarken iris Y koordinatini kontrol ederek yalanci kirpmalari engelliyor.
-
----
+<br/>
 
 ## Raspberry Pi
 
-`rasbperrypi.py` Raspberry Pi icin yazilmis surum. Windows surumunden farklari:
+`rasbperrypi.py` Raspberry Pi icin yazilmis surum. Farklari:
 
-- Kamera: Picamera2 API veya V4L2 backend kullanıyor
-- Ekran boyutu: `xrandr` ya da `tkinter` ile tespit ediyor
-- Giris kontrolu: `pynput` kutuphanesi (X11 ortami gerekli)
+- **Kamera:** Picamera2 API veya V4L2 backend
+- **Ekran boyutu:** `xrandr` ya da `tkinter` ile otomatik tespit
+- **Giris kontrolu:** `pynput` kutuphanesi (X11 ortami gerekli)
 
 Raspberry Pi 4 veya ustu onerilir, MediaPipe baya islemci istiyor.
 
----
+<br/>
 
 ## Proje yapisi
 
 ```
 darica-eyetracking/
-├── gazetracking.py          # Ana uygulama (Windows)
-├── rasbperrypi.py           # Raspberry Pi surumu
-├── face_landmarker.task     # MediaPipe yuz modeli
-├── requirements.txt         # Bagimliliklar (Windows)
-├── requirements-rpi.txt     # Bagimliliklar (Raspberry Pi)
-├── docs/
-│   └── assets/              # Logo ve gorseller
+├── gazetracking.py            # Ana uygulama (Windows)
+├── rasbperrypi.py             # Raspberry Pi surumu
+├── face_landmarker.task       # MediaPipe yuz modeli
+├── requirements.txt           # Bagimliliklar (Windows)
+├── requirements-rpi.txt       # Bagimliliklar (Raspberry Pi)
+├── docs/assets/               # Logo, banner, diyagramlar
 ├── .github/
-│   ├── workflows/ci.yml     # CI pipeline
-│   ├── ISSUE_TEMPLATE/      # Issue sablonlari
+│   ├── workflows/ci.yml       # CI pipeline
+│   ├── ISSUE_TEMPLATE/        # Issue sablonlari
 │   └── pull_request_template.md
 ├── CONTRIBUTING.md
 ├── CODE_OF_CONDUCT.md
@@ -215,14 +171,22 @@ darica-eyetracking/
 └── LICENSE
 ```
 
----
+<br/>
 
 ## Katki
 
-Hata buldunuz, ozellik fikriniz var, ya da kod gondermek istiyorsaniz [CONTRIBUTING.md](CONTRIBUTING.md) dosyasina bakin.
+Hata buldunuz, ozellik fikriniz var ya da kod gondermek istiyorsaniz [CONTRIBUTING.md](CONTRIBUTING.md) dosyasina bakin. Her turlu katki kabul edilir.
 
----
+<br/>
 
 ## Lisans
 
 [MIT](LICENSE)
+
+<br/>
+
+---
+
+<p align="center">
+  <sub>Darica Eye Tracking, goz takibi ile erisilebilirlik uzerine acik kaynak bir projedir.</sub>
+</p>
