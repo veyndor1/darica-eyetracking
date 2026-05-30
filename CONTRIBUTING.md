@@ -1,42 +1,42 @@
-# Katkı
+# Contributing
 
-Bu projeye katkıda bulunmak isterseniz aşağıdaki adımları takip edebilirsiniz.
+If you want to contribute to this project, here's how.
 
-## Hata bildirimi
+## Bug reports
 
-Bir hata bulduysanız [yeni bir issue](https://github.com/veyndor1/darica-eyetracking/issues/new) açın. Şunları yazarsanız işi kolaylaştırır:
+Found a bug? [Open an issue](https://github.com/veyndor1/darica-eyetracking/issues/new). These details help:
 
-- İşletim sisteminiz ve Python sürümünüz
-- Hatayı oluşturan adımlar
-- Ne bekliyordunuz, ne oldu
-- Kamera modeliniz (gerekliyse)
+- Your OS and Python version
+- Steps to reproduce the bug
+- What you expected vs. what happened
+- Camera model (if relevant)
 
-## Özellik önerisi
+## Feature ideas
 
-Bir fikriniz varsa yine issue açabilirsiniz. Ne için gerektiğini ve hangi durumda işe yarayacağını açıklarsanız değerlendirmesi daha kolay olur.
+If you have an idea, open an issue and describe what problem it would solve and when it would be useful.
 
-## Kod göndermek
+## Sending code
 
-1. Repoyu forklayın
-2. Branch açın: `git checkout -b ozellik/aciklayici-isim`
-3. Değişikliklerinizi yapın ve commitleyin
-4. Push edin: `git push origin ozellik/aciklayici-isim`
-5. Pull Request açın
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/descriptive-name`
+3. Make your changes and commit
+4. Push: `git push origin feature/descriptive-name`
+5. Open a Pull Request
 
-## Geliştirme ortamı
+## Dev setup
 
 ```bash
-git clone https://github.com/<kullanıcı-adınız>/darica-eyetracking.git
+git clone https://github.com/<your-username>/darica-eyetracking.git
 cd darica-eyetracking
 pip install -r requirements.txt
 ```
 
-## Commit mesajları
+## Commit messages
 
-Açıklayıcı commit mesajları yazın:
+Use descriptive commit messages:
 
 ```
-fix: çift kırpma algılamada yalancı pozitif düzeltmesi
-feat: kalibrasyon noktası sayısını yapılandırma seçeneği
-docs: kurulum adımlarını güncelleme
+fix: false positive in double blink detection
+feat: configurable calibration point count
+docs: update install instructions
 ```

@@ -1,71 +1,71 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="Darıca Eye Tracking" width="100%" />
+  <img src="docs/assets/banner.svg" alt="Darica Eye Tracking" width="100%" />
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.9%2B-brightgreen.svg" alt="Python 3.9+" />
-  <img src="https://img.shields.io/badge/lisans-MIT-blue.svg" alt="MIT" />
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Raspberry%20Pi-lightgrey" alt="Platform" />
   <img src="https://img.shields.io/badge/mediapipe-Face%20Landmarker-teal" alt="MediaPipe" />
 </p>
 
 ---
 
-## Bu proje ne?
+## What is this?
 
-Darıca Eye Tracking, sıradan bir webcam ile göz hareketlerinizi takip edip mouse imlecini kontrol eden bir yazılım. Çift kırpmayla tıklama yapabiliyorsunuz, göz kırpmalarıyla çalışan bir ekran klavyesiyle de yazı yazabiliyorsunuz. Webcam ve Python dışında bir şey gerekmiyor.
+Darica Eye Tracking tracks your eye movements with a webcam and moves the mouse cursor accordingly. Double-blink to click, or open the scan keyboard and type letter by letter using blinks. A webcam and Python are the only requirements.
 
-Fiziksel engelli bireyler bilgisayar kullanırken genelde pahalı göz takip cihazlarına ihtiyaç duyuyor. Bu projeyi bir webcam ile aynı işi yapabilmek için geliştirdim.
+Dedicated eye trackers cost a lot, and most people with physical disabilities can't easily get one. I wanted to see how far you could get with a regular webcam, and this is what came out of that.
 
-### Neler yapıyor?
+### What does it do?
 
 <table>
 <tr>
 <td width="50%">
 
-Göz takibi
-- İris pozisyonu ve baş açısıyla mouse kontrolü
-- Kişiye özel 13 noktalı kalibrasyon
-- Bakış yönünü ekran koordinatına çevirmek için TPS + Ridge regresyon
-- Titreşimi bastırmak için Kalman ve One Euro filtre
-- Yavaş hareketlerde gereksiz oynamayı engelleyen adaptif dead zone
+Gaze tracking
+- Mouse control using iris position and head angle
+- 13-point calibration, done per user
+- TPS + Ridge regression to map gaze direction to screen coordinates
+- Kalman and One Euro filters for jitter suppression
+- Adaptive dead zone that ignores small movements when you're mostly still
 
 </td>
 <td width="50%">
 
-Kırpma ve klavye
-- Çift kırpma sol tıklama olarak çalışıyor
-- Göz kırpmasıyla harf harf ilerleyen tarama klavyesi
-- Yazarken Türkçe kelime tahmini
-- Aşağı bakışta yalancı kırpmayı engelleyen adaptif EAR eşiği
-- 2 saniye göz kapatınca klavye açılıp kapanıyor
+Blink and keyboard
+- Double blink works as a left click
+- Scan keyboard: blinks advance through letters one by one
+- Turkish word prediction while typing
+- Adaptive EAR threshold so looking down doesn't count as a blink
+- Hold eyes closed for 2 seconds to toggle the keyboard on or off
 
 </td>
 </tr>
 </table>
 
-## Sistem mimarisi
+## System architecture
 
 <p align="center">
-  <img src="docs/assets/architecture.svg" alt="Sistem mimarisi" width="100%" />
+  <img src="docs/assets/architecture.svg" alt="System architecture" width="100%" />
 </p>
 
 <details>
-<summary>Teknik detaylar</summary>
+<summary>Technical details</summary>
 
 <br/>
 
-MediaPipe Face Landmarker yüzden 478 nokta çıkartıyor. Bunların içinden iris landmarkları (468-477) ve baş dönüşüm matrisini alıyorum. Ridge regresyon ve TPS interpolasyonuyla birleştirip kalibre edilmiş ekran koordinatlarına çeviriyorum.
+MediaPipe Face Landmarker pulls 478 landmarks off your face. I grab the iris ones (468-477) and the head transformation matrix, then run Ridge regression and TPS interpolation to turn that into screen coordinates.
 
-Filtreleme üç katmanlı: One Euro Filter düşük gecikmeyle yumuşatma, Kalman Filter gürültü azaltma, Adaptif Dead Zone da yavaş hareketlerde küçük titreşimleri yok sayma. Üçünü bir arada kullanınca imleç makul düzeyde sabit kalıyor.
+Between the raw gaze estimate and the actual cursor, three filters run in sequence. One Euro Filter does low-latency smoothing, Kalman Filter handles noise, and Adaptive Dead Zone throws out tiny jitters when you're mostly holding still. The cursor is reasonably stable after all three, though it's not perfect.
 
-Kırpma algılama Eye Aspect Ratio (EAR) üzerinden çalışıyor. Eşik sabit değil, sürekli güncelleniyor. Aşağı bakarken göz kapağı doğal olarak biraz kapanıyor; bunu kırpma sanmasın diye iris Y koordinatını da kontrol ediyorum.
+Blink detection uses Eye Aspect Ratio (EAR) with an adaptive threshold. Looking down naturally closes your eyelid a bit, which triggers false positives if you're not careful. I check the iris Y coordinate to avoid that.
 
 </details>
 
-## Kurulum
+## Setup
 
-Python 3.9+, bir webcam ve Windows 10/11 ya da Raspberry Pi OS gerekiyor.
+You need Python 3.9+, a webcam, and either Windows 10/11 or Raspberry Pi OS.
 
 ### Windows
 
@@ -83,16 +83,16 @@ cd darica-eyetracking
 pip install -r requirements-rpi.txt
 ```
 
-### MediaPipe modeli
+### MediaPipe model
 
-`face_landmarker.task` repoda zaten var. Güncellemek isterseniz:
+The model file (`face_landmarker.task`) is in the repo already. If you want a newer version:
 
 ```bash
 wget -O face_landmarker.task \
   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
 ```
 
-## Çalıştırma
+## Usage
 
 ```bash
 # Windows
@@ -102,52 +102,46 @@ python gazetracking.py
 python rasbperrypi.py
 ```
 
-Program açılınca 13 noktalı bir kalibrasyon ekranı çıkıyor. Her noktaya sırayla bakın, hem başınızı hem gözlerinizi noktaya çevirin. Kalibrasyon bitince imleç gözünüze göre hareket etmeye başlıyor.
+The program starts with a 13-point calibration screen. Look at each dot, move your head and eyes toward it. After calibration, the cursor follows your gaze.
 
-### Kısayollar
+### Shortcuts
 
-| Tuş | Ne yapıyor |
+| Key | What it does |
 |:---:|------------|
-| `q` | Çıkış |
-| `c` | Yeniden kalibrasyon |
-| `p` | Mouse kontrolünü aç/kapat |
-| `b` | Tıklamayı aç/kapat |
+| `q` | Quit |
+| `c` | Recalibrate |
+| `p` | Toggle mouse control |
+| `b` | Toggle clicking |
 
-### Tarama klavyesi
+### Scan keyboard
 
-Gözlerinizi 2 saniye kapalı tutunca tarama klavyesi açılıyor (aynı şekilde kapanıyor):
+The scan keyboard opens when you close your eyes for about 2 seconds (same to close it):
 
-| Hareket | Sonuç |
-|---------|-------|
-| Tek kırpma | Sonraki harfe geç |
-| Çift kırpma | Seçili harfi yaz |
-| ~1 sn göz kapalı | Sonraki satıra atla |
-| ~2 sn göz kapalı | Klavyeyi aç/kapat |
+| Action | Result |
+|--------|--------|
+| Single blink | Next letter |
+| Double blink | Type selected letter |
+| ~1 sec eyes closed | Skip to next row |
+| ~2 sec eyes closed | Toggle keyboard |
 
-## Raspberry Pi sürümü
+## Raspberry Pi version
 
-`rasbperrypi.py` dosyası Raspberry Pi için. Windows sürümünden farkları:
+`rasbperrypi.py` uses Picamera2 or V4L2 for camera input, xrandr or tkinter to figure out screen size, and pynput for mouse and keyboard control (you need X11 running). Pi 4 or newer works best since MediaPipe eats CPU.
 
-- Kamerayı Picamera2 API ya da V4L2 backend ile açıyor
-- Ekran boyutunu `xrandr` veya `tkinter` ile tespit ediyor
-- Mouse ve klavye kontrolü için `pynput` kullanıyor (X11 ortamı gerekli)
-
-Raspberry Pi 4 veya üstünde çalıştırmanızı öneririm, MediaPipe işlemci yiyor.
-
-## Proje yapısı
+## Project structure
 
 ```
 darica-eyetracking/
-├── gazetracking.py            # Ana uygulama (Windows)
-├── rasbperrypi.py             # Raspberry Pi sürümü
-├── face_landmarker.task       # MediaPipe yüz modeli
-├── requirements.txt           # Bağımlılıklar (Windows)
-├── requirements-rpi.txt       # Bağımlılıklar (Raspberry Pi)
-├── docs/assets/               # Logo, banner, diyagramlar
-├── CHANGELOG.md               # Sürüm geçmişi
-└── LICENSE                    # MIT lisansı
+├── gazetracking.py            # Main app (Windows)
+├── rasbperrypi.py             # Raspberry Pi version
+├── face_landmarker.task       # MediaPipe face model
+├── requirements.txt           # Dependencies (Windows)
+├── requirements-rpi.txt       # Dependencies (Raspberry Pi)
+├── docs/assets/               # Logo, banner, diagrams
+├── CHANGELOG.md               # Version history
+└── LICENSE                    # MIT license
 ```
 
-## Lisans
+## License
 
 [MIT](LICENSE)
