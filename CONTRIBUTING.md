@@ -1,48 +1,42 @@
-# Katki rehberi
+# Katkı
+
+Bu projeye katkıda bulunmak isterseniz aşağıdaki adımları takip edebilirsiniz.
 
 ## Hata bildirimi
 
-Bir hata bulduyseniz [yeni bir issue](https://github.com/veyndor1/darica-eyetracking/issues/new?template=bug_report.yml) acin. Su bilgileri eklemeniz isi kolaylastirir:
+Bir hata bulduysanız [yeni bir issue](https://github.com/veyndor1/darica-eyetracking/issues/new) açın. Şunları yazarsanız işi kolaylaştırır:
 
-- Isletim sistemi ve Python surumu
-- Hatayi olusturan adimlar
+- İşletim sisteminiz ve Python sürümünüz
+- Hatayı oluşturan adımlar
 - Ne bekliyordunuz, ne oldu
-- Kamera modeli (gerekirse)
+- Kamera modeliniz (gerekliyse)
 
-## Ozellik onerisi
+## Özellik önerisi
 
-Bir fikriniz varsa [feature request](https://github.com/veyndor1/darica-eyetracking/issues/new?template=feature_request.yml) acin. Ne icin gerektigini ve hangi durumda ise yarayacagini yazin.
+Bir fikriniz varsa yine issue açabilirsiniz. Ne için gerektiğini ve hangi durumda işe yarayacağını açıklarsanız değerlendirmesi daha kolay olur.
 
-## Kod gondermek
+## Kod göndermek
 
-1. Repoyu forklayin
-2. Branch acin: `git checkout -b feature/ozellik-adi`
-3. Degisikliklerinizi yapin, commitleyin
-4. Push edin: `git push origin feature/ozellik-adi`
-5. Pull Request acin
+1. Repoyu forklayın
+2. Branch açın: `git checkout -b ozellik/aciklayici-isim`
+3. Değişikliklerinizi yapın ve commitleyin
+4. Push edin: `git push origin ozellik/aciklayici-isim`
+5. Pull Request açın
 
-## Gelistirme ortami
+## Geliştirme ortamı
 
 ```bash
-git clone https://github.com/<kullanici-adiniz>/darica-eyetracking.git
+git clone https://github.com/<kullanıcı-adınız>/darica-eyetracking.git
 cd darica-eyetracking
 pip install -r requirements.txt
 ```
 
-## Kod stili
+## Commit mesajları
 
-- Degisken ve fonksiyon adlari aciklayici olsun
-- Karmasik yerlere kisa yorum ekleyin
-- Mevcut stile uyun
-
-## Commit mesajlari
+Açıklayıcı commit mesajları yazın:
 
 ```
-fix: cift kirpma algilamada yalanci pozitif duzeltmesi
-feat: kalibrasyon noktasi sayisini yapilandirma secenegi
-docs: kurulum adimlarini guncelleme
+fix: çift kırpma algılamada yalancı pozitif düzeltmesi
+feat: kalibrasyon noktası sayısını yapılandırma seçeneği
+docs: kurulum adımlarını güncelleme
 ```
-
-## Soru sormak
-
-[Issue](https://github.com/veyndor1/darica-eyetracking/issues) acabilirsiniz.
