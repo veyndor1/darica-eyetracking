@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f766e"/>
+      <stop offset="100%" style="stop-color:#115e59"/>
+    </linearGradient>
+    <linearGradient id="iris" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2dd4bf"/>
+      <stop offset="100%" style="stop-color:#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#bg)" stroke="#0d9488" stroke-width="2"/>
+  <!-- Eye shape -->
+  <path d="M20 60 Q60 28 100 60 Q60 92 20 60 Z" fill="#f0fdfa" stroke="#134e4a" stroke-width="1.5"/>
+  <!-- Iris -->
+  <circle cx="60" cy="60" r="16" fill="url(#iris)"/>
+  <!-- Pupil -->
+  <circle cx="60" cy="60" r="7" fill="#134e4a"/>
+  <!-- Light reflection -->
+  <circle cx="55" cy="55" r="3" fill="#ffffff" opacity="0.8"/>
+  <!-- Cursor indicator -->
+  <path d="M88 82 L88 100 L93 95 L97 103 L100 101 L96 93 L102 90 Z" fill="#f59e0b" stroke="#d97706" stroke-width="0.8"/>
+</svg>

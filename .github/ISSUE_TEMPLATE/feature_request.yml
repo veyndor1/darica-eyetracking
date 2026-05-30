@@ -1,0 +1,47 @@
+name: Ozellik Istegi
+description: Yeni bir ozellik onerin
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ozellik oneriniz icin tesekkurler!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Hangi Sorunu Cozuyor?
+      description: Bu ozellik hangi problemi cozuyor veya hangi ihtiyaci karsiluyor?
+      placeholder: Kalibrasyon sureci cok uzun suruyor ve...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Onerilen Cozum
+      description: Ozelligin nasil calismasi gerektigini anlatın.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatifler
+      description: Dusundugunuz baska yaklasimlari var mi?
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Kategori
+      options:
+        - Goz Takibi / Dogruluk
+        - Kalibrasyon
+        - Tarama Klavyesi
+        - Performans
+        - Raspberry Pi
+        - Arayuz / Kullanilabilirlik
+        - Diger
+    validations:
+      required: true
